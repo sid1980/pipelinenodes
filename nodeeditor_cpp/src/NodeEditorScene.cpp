@@ -328,6 +328,7 @@ void NodeEditorScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
                 delete m_tempConnection;
             }
             m_tempConnection = addLine(QLineF(node->outputPortPosition(), event->scenePos()), QPen(QColor(130, 150, 250), 2.0));
+            m_tempConnection->setZValue(4.0);
             event->accept();
             return;
         }

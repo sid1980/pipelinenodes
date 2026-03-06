@@ -9,6 +9,7 @@
 #include <QPainter>
 #include <QPointF>
 #include <QString>
+#include <QVariant>
 
 /*!\brief Тип ноды в графе редактора. */
 enum class NodeType
@@ -42,6 +43,7 @@ public:
     void refreshGeometry();
 
 protected:
+    QVariant itemChange(GraphicsItemChange change, const QVariant& value);
     void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget);
 
 private:

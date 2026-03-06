@@ -1,6 +1,9 @@
 #include "NodeItem.h"
 
+#include "NodeEditorScene.h"
+
 #include <QBrush>
+#include <QMetaObject>
 #include <QPen>
 
 namespace
@@ -134,6 +137,17 @@ void NodeItem::refreshGeometry()
     }
 }
 
+
+QVariant NodeItem::itemChange(GraphicsItemChange change, const QVariant& value)
+{
+    if (change == QGraphicsItem::ItemPositionHasChanged && scene() != NULL) {
+        NodeEditorScene* nodeScene = dynamic_cast<NodeEditorScene*>(scene());
+        if (nodeScene != NULL) {
+            QMetaObject::invokeMethod(nodeScene, "slot_updateConnections", Qt::DirectConnection);
+        }
+    }
+    return QGraphicsRectItem::itemChange(change, value);
+}
 void NodeItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
     Q_UNUSED(option);
