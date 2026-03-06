@@ -184,6 +184,7 @@ class ArchiveScene(QGraphicsScene):
     node_added = Signal(object)
     node_removed = Signal(str)
     connection_added = Signal(str, str, str, int, int)
+    execution_finished = Signal(bool, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -239,6 +240,7 @@ class ArchiveScene(QGraphicsScene):
         widget = ArchiveNode()
         node = NodeItem(node_id, "Архив", widget, self.style)
         widget.ports_changed.connect(lambda: self.on_node_ports_changed(node_id))
+        widget.execute_requested.connect(lambda: self.execute_archive_node(node_id))
         node.setPos(pos)
         self.addItem(node)
         self.nodes[node_id] = node
@@ -249,10 +251,22 @@ class ArchiveScene(QGraphicsScene):
         node = self.nodes.get(node_id)
         if not node:
             return
-        for conn_id in list(node.input_connections.keys()) + list(node.output_connections.keys()):
+
+        preserved_input_links = []
+        new_input_count = node.widget.input_count_spin.value() if isinstance(node.widget, ArchiveNode) else 1
+        for conn_id, (start_node_id, start_port, end_port) in list(node.input_connections.items()):
+            if end_port < new_input_count:
+                preserved_input_links.append((start_node_id, start_port, end_port))
             self.remove_connection(conn_id)
+
+        for conn_id in list(node.output_connections.keys()):
+            self.remove_connection(conn_id)
+
         node.setup_ports()
         node.update()
+
+        for start_node_id, start_port, end_port in preserved_input_links:
+            self.add_connection(start_node_id, node_id, start_port, end_port)
 
     def add_connection(self, start_node_id: str, end_node_id: str, start_port: int, end_port: int) -> Optional[str]:
         if start_node_id not in self.nodes or end_node_id not in self.nodes:
@@ -387,8 +401,14 @@ class ArchiveScene(QGraphicsScene):
             if start and end:
                 self.add_connection(start, end, conn_data.get("start_port", 0), conn_data.get("end_port", 0))
 
-    def execute_archive(self) -> Tuple[bool, str]:
+    def execute_archive_node(self, node_id: str):
+        success, message = self.execute_archive(node_id)
+        self.execution_finished.emit(success, message)
+
+    def execute_archive(self, target_node_id: Optional[str] = None) -> Tuple[bool, str]:
         archive_nodes = [n for n in self.nodes.values() if isinstance(n.widget, ArchiveNode)]
+        if target_node_id is not None:
+            archive_nodes = [n for n in archive_nodes if n.node_id == target_node_id]
         if not archive_nodes:
             return False, "Нет нод архива для выполнения"
 
@@ -396,29 +416,32 @@ class ArchiveScene(QGraphicsScene):
         errors: List[str] = []
         for archive_node in archive_nodes:
             files = []
-            for start_id, *_ in archive_node.input_connections.values():
+            for start_id, _, _ in archive_node.input_connections.values():
                 src = self.nodes.get(start_id)
                 if src and isinstance(src.widget, FileNode) and src.widget.file_path:
-                    files.append(src.widget.file_path)
+                    files.append((src.node_id, src.widget.file_path))
 
             if not files:
-                errors.append("Нет входных файлов")
+                errors.append(f"{archive_node.node_id}: Нет входных файлов")
                 continue
 
             archive_name = archive_node.widget.archive_name_edit.text().strip()
             save_path = archive_node.widget.save_path
             if not archive_name:
-                errors.append("Не задано имя архива")
+                errors.append(f"{archive_node.node_id}: Не задано имя архива")
                 continue
             if not save_path or not os.path.isdir(save_path):
-                errors.append("Не задана директория сохранения")
+                errors.append(f"{archive_node.node_id}: Не задана директория сохранения")
                 continue
 
             try:
                 with tempfile.TemporaryDirectory() as tmp_dir:
-                    for source in files:
-                        if os.path.exists(source):
-                            shutil.copy2(source, tmp_dir)
+                    for source_node_id, source_path in files:
+                        if not os.path.exists(source_path):
+                            continue
+                        base_name = os.path.basename(source_path)
+                        unique_name = f"{source_node_id}_{base_name}"
+                        shutil.copy2(source_path, os.path.join(tmp_dir, unique_name))
 
                     full_name = archive_name if archive_name.endswith(".tar.gz") else f"{archive_name}.tar.gz"
                     output = os.path.join(save_path, full_name)

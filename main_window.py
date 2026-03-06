@@ -57,6 +57,7 @@ class MainWindow(QMainWindow):
         self._setup_settings_panel()
 
         self.scene.selectionChanged.connect(self.on_scene_selection_changed)
+        self.scene.execution_finished.connect(self.on_archive_execution_finished)
 
     def _setup_menu(self):
         file_menu = self.menuBar().addMenu("&Файл")
@@ -268,6 +269,9 @@ class MainWindow(QMainWindow):
 
     def on_execute(self):
         success, message = self.scene.execute_archive()
+        self.on_archive_execution_finished(success, message)
+
+    def on_archive_execution_finished(self, success: bool, message: str):
         if success:
             QMessageBox.information(self, "Успех", message)
         else:

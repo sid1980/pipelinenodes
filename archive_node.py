@@ -12,6 +12,7 @@ from node_data import ArchiveNodeData
 class ArchiveNode(QWidget):
     """Виджет для ноды архива"""
     ports_changed = Signal()
+    execute_requested = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -113,6 +114,27 @@ class ArchiveNode(QWidget):
         layout.addLayout(count_layout)
         layout.addWidget(self.path_button)
         layout.addWidget(self.path_label)
+
+        self.execute_button = QPushButton("Выполнить")
+        self.execute_button.setMinimumHeight(28)
+        self.execute_button.setStyleSheet("""
+            QPushButton {
+                background-color: #43A047;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                padding: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2E7D32;
+            }
+            QPushButton:pressed {
+                background-color: #1B5E20;
+            }
+        """)
+        self.execute_button.clicked.connect(self.execute_requested.emit)
+        layout.addWidget(self.execute_button)
         
         self.setLayout(layout)
         self.setMinimumWidth(250)
