@@ -51,7 +51,6 @@ QString NodeEditorScene::addArchiveNode(const QPointF& position)
     item->setPos(position);
     m_nodes[id] = item;
     connect(item->archiveWidget(), SIGNAL(signal_archiveChanged()), this, SLOT(slot_updateConnections()));
-    connect(item->archiveWidget(), SIGNAL(signal_archiveRequested()), this, SLOT(slot_archiveRequested()));
     return id;
 }
 
@@ -286,24 +285,6 @@ void NodeEditorScene::slot_updateConnections()
     }
 }
 
-void NodeEditorScene::slot_archiveRequested()
-{
-    ArchiveNodeWidget* widget = qobject_cast<ArchiveNodeWidget*>(sender());
-    if (widget == NULL) {
-        return;
-    }
-
-    for (std::map<QString, NodeItem*>::iterator it = m_nodes.begin(); it != m_nodes.end(); ++it) {
-        NodeItem* node = it->second;
-        if (node->archiveWidget() == widget) {
-            QString message;
-            const bool success = executeArchive(node->id(), &message);
-            emit signal_executionFinished(success, message);
-            return;
-        }
-    }
-}
-
 void NodeEditorScene::drawBackground(QPainter* painter, const QRectF& rect)
 {
     painter->fillRect(rect, QColor(53, 53, 53));
@@ -338,10 +319,7 @@ void NodeEditorScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 
     if (event->button() == Qt::LeftButton) {
         QGraphicsItem* item = itemAt(event->scenePos(), QTransform());
-        NodeItem* node = dynamic_cast<NodeItem*>(item);
-        if (node == NULL && item != NULL && item->parentItem() != NULL) {
-            node = dynamic_cast<NodeItem*>(item->parentItem());
-        }
+        NodeItem* node = findNodeItem(item);
 
         if (node != NULL && node->nodeType() == NodeType::File && node->isOutputPortAt(event->scenePos())) {
             m_dragFileNodeId = node->id();
@@ -375,10 +353,7 @@ void NodeEditorScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
     if (event != NULL && event->button() == Qt::LeftButton && m_tempConnection != NULL) {
         QGraphicsItem* item = itemAt(event->scenePos(), QTransform());
-        NodeItem* node = dynamic_cast<NodeItem*>(item);
-        if (node == NULL && item != NULL && item->parentItem() != NULL) {
-            node = dynamic_cast<NodeItem*>(item->parentItem());
-        }
+        NodeItem* node = findNodeItem(item);
 
         if (node != NULL && node->nodeType() == NodeType::Archive) {
             const int inputIndex = node->inputPortAt(event->scenePos());
@@ -397,6 +372,19 @@ void NodeEditorScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
     }
 
     QGraphicsScene::mouseReleaseEvent(event);
+}
+
+NodeItem* NodeEditorScene::findNodeItem(QGraphicsItem* item) const
+{
+    QGraphicsItem* current = item;
+    while (current != NULL) {
+        NodeItem* node = dynamic_cast<NodeItem*>(current);
+        if (node != NULL) {
+            return node;
+        }
+        current = current->parentItem();
+    }
+    return NULL;
 }
 
 QString NodeEditorScene::createNodeId()

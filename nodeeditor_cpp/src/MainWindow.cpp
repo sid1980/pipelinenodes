@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QMetaObject>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStackedWidget>
@@ -131,9 +132,13 @@ void MainWindow::slot_selectionChanged()
     }
     else {
         m_settingsStack->setCurrentWidget(m_archiveWidget);
+        m_archiveNameEdit->blockSignals(true);
+        m_archiveInputSpin->blockSignals(true);
         m_archiveNameEdit->setText(node->archiveWidget()->archiveName());
         m_archiveInputSpin->setValue(node->archiveWidget()->inputCount());
         m_archiveDirectoryEdit->setText(node->archiveWidget()->saveDirectory());
+        m_archiveNameEdit->blockSignals(false);
+        m_archiveInputSpin->blockSignals(false);
     }
 }
 
@@ -145,6 +150,77 @@ void MainWindow::slot_showExecutionResult(bool success, const QString& message)
     else {
         QMessageBox::warning(this, QString::fromUtf8("Результат"), message);
     }
+}
+
+void MainWindow::slot_selectFileForNode()
+{
+    NodeItem* node = firstSelectedNode();
+    if (node == 0 || node->nodeType() != NodeType::File || node->fileWidget() == 0) {
+        return;
+    }
+
+    const QString path = QFileDialog::getOpenFileName(this,
+                                                      QString::fromUtf8("Выбор файла"),
+                                                      QString(),
+                                                      QString::fromUtf8("Все файлы (*.*)"));
+    if (path.isEmpty()) {
+        return;
+    }
+
+    node->fileWidget()->setFilePath(path);
+    m_filePathEdit->setText(path);
+}
+
+void MainWindow::slot_selectDirectoryForNode()
+{
+    NodeItem* node = firstSelectedNode();
+    if (node == 0 || node->nodeType() != NodeType::Archive || node->archiveWidget() == 0) {
+        return;
+    }
+
+    const QString path = QFileDialog::getExistingDirectory(this,
+                                                            QString::fromUtf8("Каталог архивации"),
+                                                            QString(),
+                                                            QFileDialog::ShowDirsOnly);
+    if (path.isEmpty()) {
+        return;
+    }
+
+    node->archiveWidget()->setSaveDirectory(path);
+    m_archiveDirectoryEdit->setText(path);
+}
+
+void MainWindow::slot_executeSelectedArchive()
+{
+    NodeItem* node = firstSelectedNode();
+    if (node == 0 || node->nodeType() != NodeType::Archive) {
+        QMessageBox::warning(this, QString::fromUtf8("Результат"), QString::fromUtf8("Выберите архивную ноду"));
+        return;
+    }
+
+    QString message;
+    const bool success = m_scene->executeArchive(node->id(), &message);
+    slot_showExecutionResult(success, message);
+}
+
+void MainWindow::slot_archiveNameChanged(const QString& value)
+{
+    NodeItem* node = firstSelectedNode();
+    if (node == 0 || node->nodeType() != NodeType::Archive || node->archiveWidget() == 0) {
+        return;
+    }
+    node->archiveWidget()->setArchiveName(value);
+}
+
+void MainWindow::slot_archiveInputChanged(int value)
+{
+    NodeItem* node = firstSelectedNode();
+    if (node == 0 || node->nodeType() != NodeType::Archive || node->archiveWidget() == 0) {
+        return;
+    }
+    node->archiveWidget()->setInputCount(value);
+    node->refreshGeometry();
+    QMetaObject::invokeMethod(m_scene, "slot_updateConnections", Qt::DirectConnection);
 }
 
 void MainWindow::setupUi()
@@ -185,7 +261,9 @@ void MainWindow::setupUi()
     QFormLayout* fileLayout = new QFormLayout(m_fileWidget);
     m_filePathEdit = new QLineEdit(m_fileWidget);
     m_filePathEdit->setReadOnly(true);
+    QPushButton* selectFileButton = new QPushButton(QString::fromUtf8("Выбрать файл..."), m_fileWidget);
     fileLayout->addRow(QString::fromUtf8("Путь"), m_filePathEdit);
+    fileLayout->addRow(QString(), selectFileButton);
 
     QFormLayout* archiveLayout = new QFormLayout(m_archiveWidget);
     m_archiveNameEdit = new QLineEdit(m_archiveWidget);
@@ -193,9 +271,14 @@ void MainWindow::setupUi()
     m_archiveInputSpin->setMinimum(1);
     m_archiveInputSpin->setMaximum(10);
     m_archiveDirectoryEdit = new QLineEdit(m_archiveWidget);
+    m_archiveDirectoryEdit->setReadOnly(true);
+    QPushButton* selectDirectoryButton = new QPushButton(QString::fromUtf8("Выбрать папку..."), m_archiveWidget);
+    QPushButton* executeArchiveButton = new QPushButton(QString::fromUtf8("Архивировать"), m_archiveWidget);
     archiveLayout->addRow(QString::fromUtf8("Имя"), m_archiveNameEdit);
     archiveLayout->addRow(QString::fromUtf8("Входы"), m_archiveInputSpin);
     archiveLayout->addRow(QString::fromUtf8("Каталог"), m_archiveDirectoryEdit);
+    archiveLayout->addRow(QString(), selectDirectoryButton);
+    archiveLayout->addRow(QString(), executeArchiveButton);
 
     m_settingsStack->addWidget(m_emptyWidget);
     m_settingsStack->addWidget(m_fileWidget);
@@ -204,6 +287,12 @@ void MainWindow::setupUi()
 
     dock->setWidget(content);
     addDockWidget(Qt::RightDockWidgetArea, dock);
+
+    connect(selectFileButton, SIGNAL(clicked()), this, SLOT(slot_selectFileForNode()));
+    connect(selectDirectoryButton, SIGNAL(clicked()), this, SLOT(slot_selectDirectoryForNode()));
+    connect(executeArchiveButton, SIGNAL(clicked()), this, SLOT(slot_executeSelectedArchive()));
+    connect(m_archiveNameEdit, SIGNAL(textChanged(QString)), this, SLOT(slot_archiveNameChanged(QString)));
+    connect(m_archiveInputSpin, SIGNAL(valueChanged(int)), this, SLOT(slot_archiveInputChanged(int)));
 
     connect(m_scene, SIGNAL(selectionChanged()), this, SLOT(slot_selectionChanged()));
     connect(m_scene, SIGNAL(signal_executionFinished(bool,QString)), this, SLOT(slot_showExecutionResult(bool,QString)));

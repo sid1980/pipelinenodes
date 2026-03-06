@@ -4,12 +4,11 @@
 #include <QWidget>
 
 class QLineEdit;
-class QPushButton;
 class QSpinBox;
 
 /*!\brief Виджет архивной ноды.
  *
- * Хранит параметры архивации и содержит кнопки выбора каталога и запуска архивации.
+ * Хранит параметры архивации.
  * Пример: archiveNode->setArchiveName("result");
  */
 class ArchiveNodeWidget : public QWidget
@@ -29,18 +28,11 @@ public:
 
 signals:
     void signal_archiveChanged();
-    void signal_archiveRequested();
-
-public slots:
-    void slot_selectDirectory();
-    void slot_requestArchive();
 
 private:
     QLineEdit* m_archiveName;
     QSpinBox* m_inputCount;
     QLineEdit* m_saveDirectory;
-    QPushButton* m_selectDirectoryButton;
-    QPushButton* m_archiveButton;
 };
 
 #endif

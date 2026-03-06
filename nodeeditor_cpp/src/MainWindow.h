@@ -34,6 +34,11 @@ public slots:
     void slot_deleteSelected();
     void slot_selectionChanged();
     void slot_showExecutionResult(bool success, const QString& message);
+    void slot_selectFileForNode();
+    void slot_selectDirectoryForNode();
+    void slot_executeSelectedArchive();
+    void slot_archiveNameChanged(const QString& value);
+    void slot_archiveInputChanged(int value);
 
 private:
     void setupUi();

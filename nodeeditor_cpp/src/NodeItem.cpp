@@ -5,12 +5,13 @@
 
 namespace
 {
-static const qreal k_width = 300.0;
-static const qreal k_headerHeight = 28.0;
+static const qreal k_width = 330.0;
+static const qreal k_headerHeight = 30.0;
 static const qreal k_portRadius = 6.0;
-static const qreal k_portMargin = 12.0;
-static const qreal k_fileHeight = 120.0;
-static const qreal k_archiveBaseHeight = 170.0;
+static const qreal k_portMargin = 9.0;
+static const qreal k_contentInset = 22.0;
+static const qreal k_contentTopInset = 10.0;
+static const qreal k_contentBottomInset = 10.0;
 static const qreal k_archivePortStep = 24.0;
 }
 
@@ -21,7 +22,7 @@ NodeItem::NodeItem(const QString& id, NodeType type)
     , m_fileWidget(NULL)
     , m_archiveWidget(NULL)
 {
-    setRect(0.0, 0.0, k_width, k_fileHeight);
+    setRect(0.0, 0.0, k_width, 140.0);
     setFlag(QGraphicsItem::ItemIsMovable, true);
     setFlag(QGraphicsItem::ItemIsSelectable, true);
     setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
@@ -67,7 +68,7 @@ QPointF NodeItem::inputPortPosition(int index) const
     if (index < 0) {
         return scenePos();
     }
-    const qreal y = k_headerHeight + 26.0 + static_cast<qreal>(index) * k_archivePortStep;
+    const qreal y = k_headerHeight + k_contentTopInset + 18.0 + static_cast<qreal>(index) * k_archivePortStep;
     return mapToScene(QPointF(k_portMargin, y));
 }
 
@@ -88,7 +89,7 @@ int NodeItem::inputPortAt(const QPointF& scenePosition) const
         const qreal distanceX = scenePosition.x() - portCenter.x();
         const qreal distanceY = scenePosition.y() - portCenter.y();
         const qreal distanceSquared = distanceX * distanceX + distanceY * distanceY;
-        if (distanceSquared <= k_portRadius * k_portRadius * 2.0) {
+        if (distanceSquared <= (k_portRadius + 3.0) * (k_portRadius + 3.0)) {
             return i;
         }
     }
@@ -105,21 +106,30 @@ bool NodeItem::isOutputPortAt(const QPointF& scenePosition) const
     const qreal distanceX = scenePosition.x() - portCenter.x();
     const qreal distanceY = scenePosition.y() - portCenter.y();
     const qreal distanceSquared = distanceX * distanceX + distanceY * distanceY;
-    return distanceSquared <= k_portRadius * k_portRadius * 2.0;
+    return distanceSquared <= (k_portRadius + 3.0) * (k_portRadius + 3.0);
 }
 
 void NodeItem::refreshGeometry()
 {
-    if (m_nodeType == NodeType::Archive && m_archiveWidget != NULL) {
-        const qreal height = k_archiveBaseHeight + static_cast<qreal>(m_archiveWidget->inputCount() - 1) * k_archivePortStep;
-        setRect(0.0, 0.0, k_width, height);
-    }
-    else {
-        setRect(0.0, 0.0, k_width, k_fileHeight);
-    }
-    m_proxy->setPos(14.0, k_headerHeight + 10.0);
+    qreal widgetHeight = 90.0;
     if (m_proxy->widget() != NULL) {
-        m_proxy->widget()->setMinimumWidth(static_cast<int>(rect().width() - 28.0));
+        widgetHeight = static_cast<qreal>(m_proxy->widget()->sizeHint().height());
+    }
+
+    qreal height = k_headerHeight + k_contentTopInset + widgetHeight + k_contentBottomInset;
+    if (m_nodeType == NodeType::Archive && m_archiveWidget != NULL) {
+        const qreal portsHeight = k_headerHeight + k_contentTopInset + 18.0 +
+                                  static_cast<qreal>(m_archiveWidget->inputCount() - 1) * k_archivePortStep + 18.0;
+        if (height < portsHeight + k_contentBottomInset) {
+            height = portsHeight + k_contentBottomInset;
+        }
+    }
+
+    setRect(0.0, 0.0, k_width, height);
+    m_proxy->setPos(k_contentInset, k_headerHeight + k_contentTopInset);
+    if (m_proxy->widget() != NULL) {
+        m_proxy->widget()->setMinimumWidth(static_cast<int>(rect().width() - 2.0 * k_contentInset));
+        m_proxy->widget()->setMaximumWidth(static_cast<int>(rect().width() - 2.0 * k_contentInset));
     }
 }
 

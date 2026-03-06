@@ -44,7 +44,6 @@ public slots:
 
 private slots:
     void slot_updateConnections();
-    void slot_archiveRequested();
 
 protected:
     void drawBackground(QPainter* painter, const QRectF& rect);
@@ -64,6 +63,8 @@ private:
 
     QString m_dragFileNodeId;
     QGraphicsLineItem* m_tempConnection;
+
+    NodeItem* findNodeItem(QGraphicsItem* item) const;
 };
 
 #endif

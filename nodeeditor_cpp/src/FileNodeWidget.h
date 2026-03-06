@@ -4,11 +4,10 @@
 #include <QWidget>
 
 class QLabel;
-class QPushButton;
 
 /*!\brief Виджет файловой ноды.
  *
- * Класс отображает путь к входному файлу и позволяет выбрать файл кнопкой.
+ * Класс отображает путь к входному файлу.
  * Пример: fileNode->setFilePath("/tmp/a.txt");
  */
 class FileNodeWidget : public QWidget
@@ -24,13 +23,9 @@ public:
 signals:
     void signal_filePathChanged();
 
-public slots:
-    void slot_selectFile();
-
 private:
     QString m_filePath;
     QLabel* m_label;
-    QPushButton* m_selectButton;
 };
 
 #endif
