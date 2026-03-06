@@ -1,10 +1,19 @@
 #include "NodeEditorScene.h"
 
 #include <QFile>
+#include <QGraphicsSceneMouseEvent>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPainter>
+#include <QPen>
 #include <QProcess>
+
+namespace
+{
+static const int k_fineGrid = 20;
+static const int k_coarseGrid = 100;
+}
 
 NodeEditorScene::NodeEditorScene(QObject* parent)
     : QGraphicsScene(parent)
@@ -12,8 +21,11 @@ NodeEditorScene::NodeEditorScene(QObject* parent)
     , m_connections()
     , m_nodeCounter(1)
     , m_connectionCounter(1)
+    , m_dragFileNodeId()
+    , m_tempConnection(NULL)
 {
     setSceneRect(-2000.0, -2000.0, 4000.0, 4000.0);
+    setBackgroundBrush(QBrush(QColor(53, 53, 53)));
 }
 
 NodeEditorScene::~NodeEditorScene()
@@ -39,6 +51,7 @@ QString NodeEditorScene::addArchiveNode(const QPointF& position)
     item->setPos(position);
     m_nodes[id] = item;
     connect(item->archiveWidget(), SIGNAL(signal_archiveChanged()), this, SLOT(slot_updateConnections()));
+    connect(item->archiveWidget(), SIGNAL(signal_archiveRequested()), this, SLOT(slot_archiveRequested()));
     return id;
 }
 
@@ -56,8 +69,17 @@ bool NodeEditorScene::connectFileToArchive(const QString& fileNodeId, const QStr
     if (fileIt->second->nodeType() != NodeType::File || archiveIt->second->nodeType() != NodeType::Archive) {
         return false;
     }
+
+    archiveIt->second->refreshGeometry();
     if (inputIndex >= archiveIt->second->archiveWidget()->inputCount()) {
         return false;
+    }
+
+    for (std::map<QString, ConnectionItem*>::const_iterator it = m_connections.begin(); it != m_connections.end(); ++it) {
+        const ConnectionItem* existing = it->second;
+        if (existing->archiveNodeId() == archiveNodeId && existing->archiveInputIndex() == inputIndex) {
+            return false;
+        }
     }
 
     const QString id = createConnectionId();
@@ -182,6 +204,7 @@ bool NodeEditorScene::loadFromJson(const QString& path, QString* errorMessage)
             m_nodes[newId]->archiveWidget()->setArchiveName(object["archive_name"].toString());
             m_nodes[newId]->archiveWidget()->setInputCount(object["input_count"].toInt(1));
             m_nodes[newId]->archiveWidget()->setSaveDirectory(object["save_directory"].toString());
+            m_nodes[newId]->refreshGeometry();
         }
         idMap[object["id"].toString()] = newId;
     }
@@ -243,6 +266,13 @@ void NodeEditorScene::slot_executeCurrent()
 
 void NodeEditorScene::slot_updateConnections()
 {
+    for (std::map<QString, NodeItem*>::iterator it = m_nodes.begin(); it != m_nodes.end(); ++it) {
+        NodeItem* node = it->second;
+        if (node->nodeType() == NodeType::Archive) {
+            node->refreshGeometry();
+        }
+    }
+
     for (std::map<QString, ConnectionItem*>::iterator it = m_connections.begin(); it != m_connections.end(); ++it) {
         ConnectionItem* connection = it->second;
         NodeItem* fileNode = m_nodes[connection->fileNodeId()];
@@ -254,6 +284,119 @@ void NodeEditorScene::slot_updateConnections()
         const QPointF to = archiveNode->inputPortPosition(connection->archiveInputIndex());
         connection->setLine(QLineF(from, to));
     }
+}
+
+void NodeEditorScene::slot_archiveRequested()
+{
+    ArchiveNodeWidget* widget = qobject_cast<ArchiveNodeWidget*>(sender());
+    if (widget == NULL) {
+        return;
+    }
+
+    for (std::map<QString, NodeItem*>::iterator it = m_nodes.begin(); it != m_nodes.end(); ++it) {
+        NodeItem* node = it->second;
+        if (node->archiveWidget() == widget) {
+            QString message;
+            const bool success = executeArchive(node->id(), &message);
+            emit signal_executionFinished(success, message);
+            return;
+        }
+    }
+}
+
+void NodeEditorScene::drawBackground(QPainter* painter, const QRectF& rect)
+{
+    painter->fillRect(rect, QColor(53, 53, 53));
+
+    painter->setPen(QPen(QColor(63, 63, 63), 1.0));
+    const int leftFine = static_cast<int>(rect.left()) - (static_cast<int>(rect.left()) % k_fineGrid);
+    const int topFine = static_cast<int>(rect.top()) - (static_cast<int>(rect.top()) % k_fineGrid);
+    for (int x = leftFine; x < static_cast<int>(rect.right()); x += k_fineGrid) {
+        painter->drawLine(x, static_cast<int>(rect.top()), x, static_cast<int>(rect.bottom()));
+    }
+    for (int y = topFine; y < static_cast<int>(rect.bottom()); y += k_fineGrid) {
+        painter->drawLine(static_cast<int>(rect.left()), y, static_cast<int>(rect.right()), y);
+    }
+
+    painter->setPen(QPen(QColor(78, 78, 78), 1.0));
+    const int leftCoarse = static_cast<int>(rect.left()) - (static_cast<int>(rect.left()) % k_coarseGrid);
+    const int topCoarse = static_cast<int>(rect.top()) - (static_cast<int>(rect.top()) % k_coarseGrid);
+    for (int x = leftCoarse; x < static_cast<int>(rect.right()); x += k_coarseGrid) {
+        painter->drawLine(x, static_cast<int>(rect.top()), x, static_cast<int>(rect.bottom()));
+    }
+    for (int y = topCoarse; y < static_cast<int>(rect.bottom()); y += k_coarseGrid) {
+        painter->drawLine(static_cast<int>(rect.left()), y, static_cast<int>(rect.right()), y);
+    }
+}
+
+void NodeEditorScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
+{
+    if (event == NULL) {
+        QGraphicsScene::mousePressEvent(event);
+        return;
+    }
+
+    if (event->button() == Qt::LeftButton) {
+        QGraphicsItem* item = itemAt(event->scenePos(), QTransform());
+        NodeItem* node = dynamic_cast<NodeItem*>(item);
+        if (node == NULL && item != NULL && item->parentItem() != NULL) {
+            node = dynamic_cast<NodeItem*>(item->parentItem());
+        }
+
+        if (node != NULL && node->nodeType() == NodeType::File && node->isOutputPortAt(event->scenePos())) {
+            m_dragFileNodeId = node->id();
+            if (m_tempConnection != NULL) {
+                removeItem(m_tempConnection);
+                delete m_tempConnection;
+            }
+            m_tempConnection = addLine(QLineF(node->outputPortPosition(), event->scenePos()), QPen(QColor(130, 150, 250), 2.0));
+            event->accept();
+            return;
+        }
+    }
+
+    QGraphicsScene::mousePressEvent(event);
+}
+
+void NodeEditorScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
+{
+    if (event != NULL && m_tempConnection != NULL) {
+        QLineF line = m_tempConnection->line();
+        line.setP2(event->scenePos());
+        m_tempConnection->setLine(line);
+        event->accept();
+        return;
+    }
+
+    QGraphicsScene::mouseMoveEvent(event);
+}
+
+void NodeEditorScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
+{
+    if (event != NULL && event->button() == Qt::LeftButton && m_tempConnection != NULL) {
+        QGraphicsItem* item = itemAt(event->scenePos(), QTransform());
+        NodeItem* node = dynamic_cast<NodeItem*>(item);
+        if (node == NULL && item != NULL && item->parentItem() != NULL) {
+            node = dynamic_cast<NodeItem*>(item->parentItem());
+        }
+
+        if (node != NULL && node->nodeType() == NodeType::Archive) {
+            const int inputIndex = node->inputPortAt(event->scenePos());
+            if (inputIndex >= 0) {
+                connectFileToArchive(m_dragFileNodeId, node->id(), inputIndex);
+            }
+        }
+
+        removeItem(m_tempConnection);
+        delete m_tempConnection;
+        m_tempConnection = NULL;
+        m_dragFileNodeId.clear();
+
+        event->accept();
+        return;
+    }
+
+    QGraphicsScene::mouseReleaseEvent(event);
 }
 
 QString NodeEditorScene::createNodeId()

@@ -4,6 +4,7 @@
 #include "ConnectionItem.h"
 #include "NodeItem.h"
 
+#include <QGraphicsLineItem>
 #include <QGraphicsScene>
 #include <QObject>
 #include <QPointF>
@@ -43,6 +44,13 @@ public slots:
 
 private slots:
     void slot_updateConnections();
+    void slot_archiveRequested();
+
+protected:
+    void drawBackground(QPainter* painter, const QRectF& rect);
+    void mousePressEvent(QGraphicsSceneMouseEvent* event);
+    void mouseMoveEvent(QGraphicsSceneMouseEvent* event);
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent* event);
 
 private:
     QString createNodeId();
@@ -53,6 +61,9 @@ private:
     std::map<QString, ConnectionItem*> m_connections;
     int m_nodeCounter;
     int m_connectionCounter;
+
+    QString m_dragFileNodeId;
+    QGraphicsLineItem* m_tempConnection;
 };
 
 #endif
