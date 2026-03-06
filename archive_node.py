@@ -74,7 +74,7 @@ class ArchiveNode(QWidget):
         count_layout.addWidget(self.input_count_spin)
         
         # Кнопка выбора места сохранения
-        self.path_button = QPushButton("Выбрать папку...")
+        self.path_button = QPushButton("Папка выбирается в правой панели")
         self.path_button.setMinimumHeight(25)
         self.path_button.setStyleSheet("""
             QPushButton {
@@ -92,7 +92,7 @@ class ArchiveNode(QWidget):
                 background-color: #0D47A1;
             }
         """)
-        self.path_button.clicked.connect(self.on_select_path)
+        self.path_button.setEnabled(False)
         
         # Метка для отображения выбранного пути
         self.path_label = QLabel("Путь не выбран")
