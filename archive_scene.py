@@ -2,7 +2,7 @@
 import json
 import os
 import shutil
-import tarfile
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -445,9 +445,14 @@ class ArchiveScene(QGraphicsScene):
 
                     full_name = archive_name if archive_name.endswith(".tar.gz") else f"{archive_name}.tar.gz"
                     output = os.path.join(save_path, full_name)
-                    with tarfile.open(output, "w:gz") as tar:
-                        for file_name in os.listdir(tmp_dir):
-                            tar.add(os.path.join(tmp_dir, file_name), arcname=file_name)
+                    subprocess.run([
+                        "tar",
+                        "-czf",
+                        output,
+                        "-C",
+                        tmp_dir,
+                        ".",
+                    ], check=True)
                 successes += 1
             except Exception as exc:
                 errors.append(str(exc))
