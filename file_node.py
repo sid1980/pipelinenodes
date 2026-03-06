@@ -41,7 +41,7 @@ class FileNode(QWidget):
         """)
         
         # Кнопка выбора файла
-        self.select_button = QPushButton("Выбрать файл...")
+        self.select_button = QPushButton("Файл выбирается в правой панели")
         self.select_button.setMinimumHeight(25)
         self.select_button.setStyleSheet("""
             QPushButton {
@@ -59,7 +59,7 @@ class FileNode(QWidget):
                 background-color: #3d8b40;
             }
         """)
-        self.select_button.clicked.connect(self.on_select_file)
+        self.select_button.setEnabled(False)
         
         # Добавляем виджеты в layout
         layout.addWidget(self.file_label)
