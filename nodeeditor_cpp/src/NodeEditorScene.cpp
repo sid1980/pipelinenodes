@@ -269,20 +269,42 @@ void NodeEditorScene::slot_updateConnections()
         NodeItem* node = it->second;
         if (node->nodeType() == NodeType::Archive) {
             node->refreshGeometry();
+            node->update();
         }
     }
 
-    for (std::map<QString, ConnectionItem*>::iterator it = m_connections.begin(); it != m_connections.end(); ++it) {
-        ConnectionItem* connection = it->second;
-        NodeItem* fileNode = m_nodes[connection->fileNodeId()];
-        NodeItem* archiveNode = m_nodes[connection->archiveNodeId()];
-        if (fileNode == 0 || archiveNode == 0) {
+    std::map<QString, ConnectionItem*>::iterator connIt = m_connections.begin();
+    while (connIt != m_connections.end()) {
+        ConnectionItem* connection = connIt->second;
+        std::map<QString, NodeItem*>::iterator fileIt = m_nodes.find(connection->fileNodeId());
+        std::map<QString, NodeItem*>::iterator archiveIt = m_nodes.find(connection->archiveNodeId());
+        if (fileIt == m_nodes.end() || archiveIt == m_nodes.end()) {
+            removeItem(connection);
+            delete connection;
+            std::map<QString, ConnectionItem*>::iterator eraseIt = connIt;
+            ++connIt;
+            m_connections.erase(eraseIt);
             continue;
         }
+
+        NodeItem* fileNode = fileIt->second;
+        NodeItem* archiveNode = archiveIt->second;
+        if (archiveNode->archiveWidget() == NULL || connection->archiveInputIndex() >= archiveNode->archiveWidget()->inputCount()) {
+            removeItem(connection);
+            delete connection;
+            std::map<QString, ConnectionItem*>::iterator eraseIt = connIt;
+            ++connIt;
+            m_connections.erase(eraseIt);
+            continue;
+        }
+
         const QPointF from = fileNode->outputPortPosition();
         const QPointF to = archiveNode->inputPortPosition(connection->archiveInputIndex());
         connection->setLine(QLineF(from, to));
+        ++connIt;
     }
+
+    update();
 }
 
 void NodeEditorScene::drawBackground(QPainter* painter, const QRectF& rect)
@@ -353,19 +375,29 @@ void NodeEditorScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 void NodeEditorScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
     if (event != NULL && event->button() == Qt::LeftButton && m_tempConnection != NULL) {
-        QGraphicsItem* item = itemAt(event->scenePos(), QTransform());
-        NodeItem* node = findNodeItem(item);
+        NodeItem* archiveNode = NULL;
+        int inputIndex = -1;
 
-        if (node != NULL && node->nodeType() == NodeType::Archive) {
-            const int inputIndex = node->inputPortAt(event->scenePos());
-            if (inputIndex >= 0) {
-                connectFileToArchive(m_dragFileNodeId, node->id(), inputIndex);
+        for (std::map<QString, NodeItem*>::iterator it = m_nodes.begin(); it != m_nodes.end(); ++it) {
+            NodeItem* node = it->second;
+            if (node == NULL || node->nodeType() != NodeType::Archive) {
+                continue;
+            }
+            const int index = node->inputPortAt(event->scenePos());
+            if (index >= 0) {
+                archiveNode = node;
+                inputIndex = index;
+                break;
             }
         }
 
         removeItem(m_tempConnection);
         delete m_tempConnection;
         m_tempConnection = NULL;
+
+        if (archiveNode != NULL && inputIndex >= 0) {
+            connectFileToArchive(m_dragFileNodeId, archiveNode->id(), inputIndex);
+        }
         m_dragFileNodeId.clear();
 
         event->accept();
