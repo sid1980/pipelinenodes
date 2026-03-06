@@ -1,6 +1,8 @@
+#include "ConnectionItem.h"
+
+#include <QBrush>
 #include <QColor>
 #include <QPen>
-#include "ConnectionItem.h"
 
 ConnectionItem::ConnectionItem(const QString& id,
                                const QString& fileNodeId,
@@ -12,6 +14,7 @@ ConnectionItem::ConnectionItem(const QString& id,
     , m_archiveInputIndex(archiveInputIndex)
 {
     setPen(QPen(QColor(120, 140, 240), 2.0));
+    setBrush(Qt::NoBrush);
     setZValue(2.0);
 }
 
@@ -37,4 +40,9 @@ QString ConnectionItem::archiveNodeId() const
 int ConnectionItem::archiveInputIndex() const
 {
     return m_archiveInputIndex;
+}
+
+void ConnectionItem::setConnectionPath(const QPainterPath& path)
+{
+    setPath(path);
 }

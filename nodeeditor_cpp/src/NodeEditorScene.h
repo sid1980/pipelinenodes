@@ -4,7 +4,8 @@
 #include "ConnectionItem.h"
 #include "NodeItem.h"
 
-#include <QGraphicsLineItem>
+#include <QGraphicsPathItem>
+#include <QPainterPath>
 #include <QGraphicsScene>
 #include <QObject>
 #include <QPointF>
@@ -50,11 +51,13 @@ protected:
     void mousePressEvent(QGraphicsSceneMouseEvent* event);
     void mouseMoveEvent(QGraphicsSceneMouseEvent* event);
     void mouseReleaseEvent(QGraphicsSceneMouseEvent* event);
+    void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event);
 
 private:
     QString createNodeId();
     QString createConnectionId();
     bool executeArchiveNode(NodeItem* archiveNode, QString* message);
+    QPainterPath buildConnectionPath(const QPointF& from, const QPointF& to) const;
 
     std::map<QString, NodeItem*> m_nodes;
     std::map<QString, ConnectionItem*> m_connections;
@@ -62,7 +65,7 @@ private:
     int m_connectionCounter;
 
     QString m_dragFileNodeId;
-    QGraphicsLineItem* m_tempConnection;
+    QGraphicsPathItem* m_tempConnection;
 
     NodeItem* findNodeItem(QGraphicsItem* item) const;
 };

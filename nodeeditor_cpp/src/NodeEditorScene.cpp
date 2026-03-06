@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPen>
 #include <QProcess>
 
@@ -300,7 +301,7 @@ void NodeEditorScene::slot_updateConnections()
 
         const QPointF from = fileNode->outputPortPosition();
         const QPointF to = archiveNode->inputPortPosition(connection->archiveInputIndex());
-        connection->setLine(QLineF(from, to));
+        connection->setConnectionPath(buildConnectionPath(from, to));
         ++connIt;
     }
 
@@ -349,8 +350,12 @@ void NodeEditorScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
                 removeItem(m_tempConnection);
                 delete m_tempConnection;
             }
-            m_tempConnection = addLine(QLineF(node->outputPortPosition(), event->scenePos()), QPen(QColor(130, 150, 250), 2.0));
+            m_tempConnection = new QGraphicsPathItem();
+            m_tempConnection->setPen(QPen(QColor(130, 150, 250), 2.0));
+            m_tempConnection->setBrush(Qt::NoBrush);
+            m_tempConnection->setPath(buildConnectionPath(node->outputPortPosition(), event->scenePos()));
             m_tempConnection->setZValue(4.0);
+            addItem(m_tempConnection);
             event->accept();
             return;
         }
@@ -362,9 +367,8 @@ void NodeEditorScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 void NodeEditorScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 {
     if (event != NULL && m_tempConnection != NULL) {
-        QLineF line = m_tempConnection->line();
-        line.setP2(event->scenePos());
-        m_tempConnection->setLine(line);
+        QPainterPath path = buildConnectionPath(m_tempConnection->path().pointAtPercent(0.0), event->scenePos());
+        m_tempConnection->setPath(path);
         event->accept();
         return;
     }
@@ -418,6 +422,49 @@ NodeItem* NodeEditorScene::findNodeItem(QGraphicsItem* item) const
         current = current->parentItem();
     }
     return NULL;
+}
+
+
+void NodeEditorScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
+{
+    if (event == NULL) {
+        QGraphicsScene::mouseDoubleClickEvent(event);
+        return;
+    }
+
+    QGraphicsItem* item = itemAt(event->scenePos(), QTransform());
+    ConnectionItem* connection = dynamic_cast<ConnectionItem*>(item);
+    if (connection == NULL && item != NULL && item->parentItem() != NULL) {
+        connection = dynamic_cast<ConnectionItem*>(item->parentItem());
+    }
+
+    if (connection != NULL) {
+        std::map<QString, ConnectionItem*>::iterator it = m_connections.find(connection->id());
+        if (it != m_connections.end()) {
+            removeItem(it->second);
+            delete it->second;
+            m_connections.erase(it);
+            update();
+            event->accept();
+            return;
+        }
+    }
+
+    QGraphicsScene::mouseDoubleClickEvent(event);
+}
+
+QPainterPath NodeEditorScene::buildConnectionPath(const QPointF& from, const QPointF& to) const
+{
+    QPainterPath path(from);
+    const qreal dx = to.x() - from.x();
+    qreal control = dx * 0.5;
+    if (control < 60.0) {
+        control = 60.0;
+    }
+    QPointF c1(from.x() + control, from.y());
+    QPointF c2(to.x() - control, to.y());
+    path.cubicTo(c1, c2, to);
+    return path;
 }
 
 QString NodeEditorScene::createNodeId()

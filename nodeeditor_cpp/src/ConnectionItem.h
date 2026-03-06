@@ -1,14 +1,15 @@
 #ifndef CONNECTIONITEM_H
 #define CONNECTIONITEM_H
 
-#include <QGraphicsLineItem>
+#include <QGraphicsPathItem>
+#include <QPainterPath>
 #include <QString>
 
 /*!\brief Линия связи между нодами.
  *
  * Класс хранит связи на уровне идентификаторов узлов и порта назначения.
  */
-class ConnectionItem : public QGraphicsLineItem
+class ConnectionItem : public QGraphicsPathItem
 {
 public:
     ConnectionItem(const QString& id,
@@ -21,6 +22,8 @@ public:
     QString fileNodeId() const;
     QString archiveNodeId() const;
     int archiveInputIndex() const;
+
+    void setConnectionPath(const QPainterPath& path);
 
 private:
     QString m_id;
