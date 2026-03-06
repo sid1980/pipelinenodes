@@ -39,6 +39,7 @@ class MainWindow(QMainWindow):
         self.archive_name_edit = None
         self.archive_inputs_spin = None
         self.archive_save_path_edit = None
+        self.archive_execute_btn = None
 
         self.setup_ui()
 
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow):
         self._setup_settings_panel()
 
         self.scene.selectionChanged.connect(self.on_scene_selection_changed)
+        self.scene.execution_finished.connect(self.on_archive_execution_finished)
 
     def _setup_menu(self):
         file_menu = self.menuBar().addMenu("&Файл")
@@ -97,6 +99,11 @@ class MainWindow(QMainWindow):
         execute_action = QAction("Выполнить", self)
         execute_action.triggered.connect(self.on_execute)
         toolbar.addAction(execute_action)
+
+        delete_action = QAction("Удалить выбранное", self)
+        delete_action.setShortcut("Del")
+        delete_action.triggered.connect(self.on_delete_selected)
+        toolbar.addAction(delete_action)
 
     def _setup_settings_panel(self):
         dock = QDockWidget("Настройки выбранной ноды", self)
@@ -161,10 +168,14 @@ class MainWindow(QMainWindow):
         save_path_btn = QPushButton("Выбрать папку...")
         save_path_btn.clicked.connect(self.on_browse_save_path)
 
+        self.archive_execute_btn = QPushButton("Выполнить")
+        self.archive_execute_btn.clicked.connect(self.on_execute_selected_archive)
+
         layout.addRow("Имя архива:", self.archive_name_edit)
         layout.addRow("Кол-во входов:", self.archive_inputs_spin)
         layout.addRow("Папка сохранения:", self.archive_save_path_edit)
         layout.addRow("", save_path_btn)
+        layout.addRow("", self.archive_execute_btn)
 
         return widget
 
@@ -268,6 +279,32 @@ class MainWindow(QMainWindow):
 
     def on_execute(self):
         success, message = self.scene.execute_archive()
+        self.on_archive_execution_finished(success, message)
+
+    def on_execute_selected_archive(self):
+        if not self.selected_node or not isinstance(self.selected_node.widget, ArchiveNode):
+            QMessageBox.warning(self, "Результат", "Выберите архивную ноду")
+            return
+        success, message = self.scene.execute_archive(self.selected_node.node_id)
+        self.on_archive_execution_finished(success, message)
+
+    def on_delete_selected(self):
+        selected_nodes = [item for item in self.scene.selectedItems() if isinstance(item, NodeItem)]
+        if not selected_nodes:
+            return
+        for node in selected_nodes:
+            self.scene.remove_node(node.node_id)
+        self.selected_node = None
+        self.settings_stack.setCurrentWidget(self.empty_settings)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Delete:
+            self.on_delete_selected()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def on_archive_execution_finished(self, success: bool, message: str):
         if success:
             QMessageBox.information(self, "Успех", message)
         else:
