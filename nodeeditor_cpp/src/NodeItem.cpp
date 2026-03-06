@@ -8,8 +8,8 @@ namespace
 static const qreal k_width = 330.0;
 static const qreal k_headerHeight = 30.0;
 static const qreal k_portRadius = 6.0;
-static const qreal k_portMargin = 9.0;
-static const qreal k_contentInset = 22.0;
+static const qreal k_portMargin = 12.0;
+static const qreal k_contentInset = 30.0;
 static const qreal k_contentTopInset = 10.0;
 static const qreal k_contentBottomInset = 10.0;
 static const qreal k_archivePortStep = 24.0;
@@ -26,6 +26,7 @@ NodeItem::NodeItem(const QString& id, NodeType type)
     setFlag(QGraphicsItem::ItemIsMovable, true);
     setFlag(QGraphicsItem::ItemIsSelectable, true);
     setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
+    setZValue(1.0);
 
     if (m_nodeType == NodeType::File) {
         m_fileWidget = new FileNodeWidget();

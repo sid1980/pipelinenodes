@@ -12,7 +12,7 @@ ConnectionItem::ConnectionItem(const QString& id,
     , m_archiveInputIndex(archiveInputIndex)
 {
     setPen(QPen(QColor(120, 140, 240), 2.0));
-    setZValue(-1.0);
+    setZValue(2.0);
 }
 
 ConnectionItem::~ConnectionItem()
